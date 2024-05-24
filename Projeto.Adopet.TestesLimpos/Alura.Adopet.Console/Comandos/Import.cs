@@ -1,36 +1,49 @@
 ﻿using Alura.Adopet.Console.Modelos;
 using Alura.Adopet.Console.Servicos;
 using Alura.Adopet.Console.Util;
+using FluentResults;
 
 namespace Alura.Adopet.Console.Comandos
 {
     [DocComandoAttribute(instrucao: "import",
         documentacao: "adopet import <ARQUIVO> comando que realiza a importação do arquivo de pets.")]
-    internal class Import:IComando
+    public class Import:IComando
     {
-        public async Task ExecutarAsync(string[] args)
+        private readonly HttpClientPet clientPet;
+
+        private readonly LeitorDeArquivo leitor;
+
+        public Import(HttpClientPet clientPet, LeitorDeArquivo leitor)
         {
-            await this.ImportacaoArquivoPetAsync(caminhoDoArquivoDeImportacao: args[1]);
+            this.clientPet = clientPet;
+            this.leitor = leitor;
         }
 
-        private async Task ImportacaoArquivoPetAsync(string caminhoDoArquivoDeImportacao)
+        public async Task<Result> ExecutarAsync()
         {
-            var leitor = new LeitorDeArquivo();
-            List<Pet> listaDePet = leitor.RealizaLeitura(caminhoDoArquivoDeImportacao);
-            foreach (var pet in listaDePet)
+            return await this.ImportacaoArquivoPetAsync();
+        }
+
+        private async Task<Result> ImportacaoArquivoPetAsync()
+        {
+            try
             {
-                System.Console.WriteLine(pet);
-                try
-                {
-                    var httpCreatePet = new HttpClientPet();
-                    await httpCreatePet.CreatePetAsync(pet);
+                List<Pet> listaDePet = leitor.RealizaLeitura();
+                foreach (var pet in listaDePet)
+                {                       
+                   await clientPet.CreatePetAsync(pet);               
                 }
-                catch (Exception ex)
-                {
-                    System.Console.WriteLine(ex.Message);
-                }
+                return Result.Ok().WithSuccess(new SuccessWithPets(listaDePet,"Importação Realizada com Sucesso!"));
             }
-            System.Console.WriteLine("Importação concluída!");
+            catch (Exception exception)
+            {
+
+                return Result.Fail(new Error("Importação falhou!").CausedBy(exception));
+            }
+            
+            
+            
+            
         }
     }
 }
